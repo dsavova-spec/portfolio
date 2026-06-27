@@ -24,6 +24,7 @@
       gap: 10px;
       align-items: center;
       color: white;
+      z-index: 10;
     }
 
     button {
@@ -53,6 +54,15 @@
       display: block;
     }
 
+    /* 🔥 annotation layer MUST exist */
+    #annotation-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+    }
+
     #pageInfo {
       margin: 0 10px;
     }
@@ -70,6 +80,7 @@
 
 <div id="viewer">
   <canvas id="pdf-canvas"></canvas>
+  <div id="annotation-layer"></div>
 </div>
 
 <!-- PDF.js -->
@@ -83,8 +94,11 @@ let pageNum = 1;
 
 const canvas = document.getElementById("pdf-canvas");
 const ctx = canvas.getContext("2d");
+const annotationLayer = document.getElementById("annotation-layer");
 
-// 🔥 IMPORTANT: full link + navigation support
+// 🔥 REQUIRED: link service for internal navigation
+const linkService = new pdfjsLib.PDFLinkService();
+
 const loadingTask = pdfjsLib.getDocument({
   url: url,
   externalLinkTarget: pdfjsLib.LinkTarget.BLANK
@@ -92,11 +106,9 @@ const loadingTask = pdfjsLib.getDocument({
 
 loadingTask.promise.then(pdf => {
   pdfDoc = pdf;
+  linkService.setDocument(pdf);
   renderPage(pageNum);
 });
-
-// 🔥 CRITICAL FIX: LinkService (handles internal links)
-const linkService = new pdfjsLib.PDFLinkService();
 
 function getScale(page) {
   const viewport = page.getViewport({ scale: 1 });
@@ -119,19 +131,62 @@ function renderPage(num) {
     canvas.width = viewport.width;
     canvas.height = viewport.height;
 
-    const renderContext = {
+    // 🔥 render PDF page
+    page.render({
       canvasContext: ctx,
       viewport: viewport
-    };
+    });
 
-    page.render(renderContext);
+    // 🔥 CLEAR annotation layer
+    annotationLayer.innerHTML = "";
 
-    // 🔥 THIS enables internal navigation
-    linkService.setDocument(pdfDoc);
-    linkService.setViewer({
-      scrollPageIntoView: ({ pageNumber }) => {
-        renderPage(pageNumber);
-      }
+    // 🔥 THIS is what enables internal links
+    page.getAnnotations().then(annotations => {
+
+      const annotationViewport = viewport;
+
+      annotations.forEach(ann => {
+
+        if (!ann.dest && !ann.url) return;
+
+        const link = document.createElement("a");
+
+        // external link
+        if (ann.url) {
+          link.href = ann.url;
+          link.target = "_blank";
+        }
+
+        // internal link (THIS IS THE IMPORTANT PART)
+        if (ann.dest) {
+          link.href = "#";
+          link.onclick = (e) => {
+            e.preventDefault();
+
+            pdfDoc.getDestination(ann.dest).then(dest => {
+              pdfDoc.getPageIndex(dest[0]).then(pageIndex => {
+                renderPage(pageIndex + 1);
+              });
+            });
+          };
+        }
+
+        const rect = annotationViewport.convertToViewportRectangle(ann.rect);
+
+        const x = Math.min(rect[0], rect[2]);
+        const y = Math.min(rect[1], rect[3]);
+        const w = Math.abs(rect[0] - rect[2]);
+        const h = Math.abs(rect[1] - rect[3]);
+
+        link.style.position = "absolute";
+        link.style.left = x + "px";
+        link.style.top = y + "px";
+        link.style.width = w + "px";
+        link.style.height = h + "px";
+        link.style.cursor = "pointer";
+
+        annotationLayer.appendChild(link);
+      });
     });
 
     document.getElementById("pageInfo").textContent =
