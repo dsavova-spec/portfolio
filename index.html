@@ -3,76 +3,69 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Портфолио на Диана Савова</title>
+  <title>Portfolio Viewer</title>
 
   <style>
-    /* Премахваме празните полета и спираме главния скрол */
     body {
       margin: 0;
       background: #111;
+      font-family: Arial, sans-serif;
+      overflow: hidden;
+      height: 100vh;
       display: flex;
       flex-direction: column;
-      height: 100vh;
-      overflow: hidden;
-      font-family: Arial, sans-serif;
     }
 
-    /* Лентата с бутоните */
     #controls {
       background: #1c1c1c;
       padding: 10px;
       display: flex;
+      justify-content: center;
       gap: 10px;
       align-items: center;
-      justify-content: center;
-      z-index: 10;
+      color: white;
+      z-index: 20;
     }
 
     button {
       padding: 8px 12px;
-      cursor: pointer;
       border: none;
+      border-radius: 6px;
+      cursor: pointer;
       background: #333;
       color: white;
-      border-radius: 6px;
-      font-size: 14px;
     }
 
     button:hover {
       background: #555;
     }
 
-    /* Контейнерът, в който стои самият PDF */
     #viewer {
       flex: 1;
+      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
-      overflow: hidden; /* Забраняваме всякакъв скрол */
       background: #222;
-      position: relative;
-      padding: 10px; /* Малко въздух около страницата */
-      box-sizing: border-box;
+      overflow: auto;
     }
 
     canvas {
-      /* Сянка за красота, за да изглежда като лист хартия */
-      box-shadow: 0 0 20px rgba(0,0,0,0.8); 
+      display: block;
+    }
+
+    /* 🔥 link layer (for clickable PDF links) */
+    #link-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      z-index: 10;
     }
 
     #pageInfo {
-      color: white;
       margin: 0 10px;
-      min-width: 80px;
-      text-align: center;
-    }
-
-    #error-msg {
-      color: #ff5555;
-      position: absolute;
-      text-align: center;
-      padding: 20px;
-      display: none;
     }
   </style>
 </head>
@@ -81,15 +74,18 @@
 
 <div id="controls">
   <button onclick="prevPage()">⬅ Назад</button>
-  <span id="pageInfo">Зареждане...</span>
+  <span id="pageInfo">Loading...</span>
   <button onclick="nextPage()">Напред ➡</button>
-  <button onclick="toggleFull()">Цял екран</button>
+  <button onclick="toggleFull()">Fullscreen</button>
 </div>
 
 <div id="viewer">
-  <div id="error-msg">Не мога да заредя PDF файла.<br>Ако си на компютъра си (file:///), браузърът го блокира. Качи го в GitHub!</div>
   <canvas id="pdf-canvas"></canvas>
+  <div id="link-layer"></div>
 </div>
+
+<!-- PDF.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <script>
 const url = "Portfolio-Savova-Diana-2026.pdf";
@@ -99,11 +95,13 @@ let pageNum = 1;
 
 const canvas = document.getElementById("pdf-canvas");
 const ctx = canvas.getContext("2d");
+const linkLayer = document.getElementById("link-layer");
 
-// 🔥 prevent PDF.js from resetting page on navigation
+// 🔥 load PDF with proper link handling
 const loadingTask = pdfjsLib.getDocument({
   url: url,
-  disableAutoFetch: false
+  externalLinkTarget: pdfjsLib.LinkTarget.BLANK,
+  ignoreDestinationZoom: true
 });
 
 loadingTask.promise.then(pdf => {
@@ -111,12 +109,12 @@ loadingTask.promise.then(pdf => {
   renderPage(pageNum);
 });
 
-// 📏 auto-fit scale (IMPORTANT FIX)
+// 📏 auto-fit scale
 function getScale(page) {
   const viewport = page.getViewport({ scale: 1 });
 
   const maxWidth = window.innerWidth;
-  const maxHeight = window.innerHeight - 60; // controls bar
+  const maxHeight = window.innerHeight - 60;
 
   return Math.min(
     maxWidth / viewport.width,
@@ -140,6 +138,38 @@ function renderPage(num) {
 
     page.render(renderContext);
 
+    // 🔥 clear old links
+    linkLayer.innerHTML = "";
+
+    // 🔥 build clickable annotation layer
+    page.getAnnotations().then(annotations => {
+
+      annotations.forEach(ann => {
+        if (!ann.url) return;
+
+        const a = document.createElement("a");
+        a.href = ann.url;
+        a.target = "_blank";
+
+        const rect = viewport.convertToViewportRectangle(ann.rect);
+
+        const x = Math.min(rect[0], rect[2]);
+        const y = Math.min(rect[1], rect[3]);
+        const w = Math.abs(rect[0] - rect[2]);
+        const h = Math.abs(rect[1] - rect[3]);
+
+        a.style.position = "absolute";
+        a.style.left = x + "px";
+        a.style.top = y + "px";
+        a.style.width = w + "px";
+        a.style.height = h + "px";
+
+        a.style.cursor = "pointer";
+
+        linkLayer.appendChild(a);
+      });
+    });
+
     document.getElementById("pageInfo").textContent =
       `Page ${num} / ${pdfDoc.numPages}`;
 
@@ -157,14 +187,14 @@ function prevPage() {
   renderPage(pageNum - 1);
 }
 
-// 🔥 FIX 2: external links open in NEW TAB
-pdfjsLib.getDocument({
-  url: url,
-  externalLinkTarget: pdfjsLib.LinkTarget.BLANK,
-  ignoreDestinationZoom: true
-});
+function toggleFull() {
+  if (!document.fullscreenElement) {
+    document.documentElement.requestFullscreen();
+  } else {
+    document.exitFullscreen();
+  }
+}
 
-// 🔥 keep page on resize (no reset)
 window.addEventListener("resize", () => {
   renderPage(pageNum);
 });
