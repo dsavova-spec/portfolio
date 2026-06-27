@@ -6,27 +6,52 @@
   <title>Portfolio Viewer</title>
 
   <style>
-    /* Премахваме всякакви отстояния и забраняваме скрола на самия сайт */
-    html, body {
+    body {
       margin: 0;
       padding: 0;
       height: 100vh;
-      width: 100vw;
-      overflow: hidden;
-      background: #222; /* Тъмен фон около PDF-а */
+      display: flex;
+      flex-direction: column;
+      background: #222;
+      color: white;
+      font-family: Arial, sans-serif;
+      text-align: center;
     }
 
-    /* Разпъваме рамката на 100% от екрана */
+    #test-bar {
+      padding: 15px;
+      background: #333;
+    }
+
+    #test-bar a {
+      color: #4CAF50;
+      font-size: 18px;
+      font-weight: bold;
+      text-decoration: none;
+      border: 1px solid #4CAF50;
+      padding: 8px 15px;
+      border-radius: 5px;
+    }
+
+    #test-bar a:hover {
+      background: #4CAF50;
+      color: white;
+    }
+
     iframe {
+      flex: 1;
       width: 100%;
-      height: 100%;
       border: none;
-      display: block;
     }
   </style>
 </head>
 
 <body>
+
+  <div id="test-bar">
+    Ако отдолу екранът е сив, натисни тук: 
+    <a href="Portfolio-Savova-Diana-2026.pdf" target="_blank">👉 ОТВОРИ ФАЙЛА ДИРЕКТНО</a>
+  </div>
 
   <iframe src="Portfolio-Savova-Diana-2026.pdf#toolbar=0&navpanes=0&view=Fit"></iframe>
 
