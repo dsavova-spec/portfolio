@@ -10,8 +10,7 @@
       margin: 0;
       background: #111;
       font-family: Arial, sans-serif;
-      /* Гарантираме, че страницата няма да се скролва */
-      overflow: hidden; 
+      overflow: hidden; /* Спира всякакво скролване на страницата */
       height: 100vh;
       display: flex;
       flex-direction: column;
@@ -47,18 +46,17 @@
       justify-content: center;
       align-items: center;
       background: #222;
-      /* Премахваме скрола вътре в самия четец */
       overflow: hidden; 
     }
 
-    /* Контейнер, който обединява картинката и линковете */
+    /* Контейнер, който държи картинката и линковете точно едни върху други */
     #page-container {
       position: relative;
     }
 
     canvas {
       display: block;
-      box-shadow: 0 0 15px rgba(0,0,0,0.5); /* Добавяме лека сянка за красота */
+      box-shadow: 0 0 15px rgba(0,0,0,0.5);
     }
 
     /* Слоят с невидимите линкове */
@@ -83,9 +81,9 @@
 
 <div id="controls">
   <button onclick="prevPage()">⬅ Назад</button>
-  <span id="pageInfo">Loading...</span>
+  <span id="pageInfo">Зареждане...</span>
   <button onclick="nextPage()">Напред ➡</button>
-  <button onclick="toggleFull()">Fullscreen</button>
+  <button onclick="toggleFull()">На цял екран</button>
 </div>
 
 <div id="viewer">
@@ -98,7 +96,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <script>
-// ЗАДЪЛЖИТЕЛНО: Указваме Worker-а, за да зарежда бързо и без грешки
+// ЗАДЪЛЖИТЕЛНО: Worker за бързо зареждане
 pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
 const url = "Portfolio-Savova-Diana-2026.pdf";
@@ -111,9 +109,10 @@ const ctx = canvas.getContext("2d");
 const pageContainer = document.getElementById("page-container");
 const linkLayer = document.getElementById("link-layer");
 
+// Зареждаме документа
 const loadingTask = pdfjsLib.getDocument({
   url: url,
-  externalLinkTarget: 2 // 2 означава BLANK (отваряне в нов прозорец)
+  externalLinkTarget: 2 // Гарантира нов прозорец за външните линкове
 });
 
 loadingTask.promise.then(pdf => {
@@ -124,10 +123,11 @@ loadingTask.promise.then(pdf => {
   document.getElementById("pageInfo").textContent = "Грешка!";
 });
 
+// Мащабиране, за да се събере на 1 страница
 function getScale(page) {
   const viewport = page.getViewport({ scale: 1 });
   const maxWidth = window.innerWidth;
-  const maxHeight = window.innerHeight - 60; // 60px заради менюто горе
+  const maxHeight = window.innerHeight - 60; 
 
   return Math.min(
     maxWidth / viewport.width,
@@ -135,6 +135,7 @@ function getScale(page) {
   );
 }
 
+// Рисуване на страницата и добавяне на линковете
 function renderPage(num) {
   pdfDoc.getPage(num).then(page => {
 
@@ -144,7 +145,7 @@ function renderPage(num) {
     canvas.width = viewport.width;
     canvas.height = viewport.height;
 
-    // Нагласяме контейнера да е със същия размер като слайда
+    // Нагласяме контейнера
     pageContainer.style.width = viewport.width + "px";
     pageContainer.style.height = viewport.height + "px";
 
@@ -155,9 +156,10 @@ function renderPage(num) {
 
     page.render(renderContext);
 
-    // ИЗГРАЖДАНЕ НА ЛИНКОВЕТЕ
+    // Изчистваме старите линкове
     linkLayer.innerHTML = ""; 
     
+    // Взимаме всички линкове от PDF файла
     page.getAnnotations().then(annotations => {
       annotations.forEach(ann => {
         if (ann.subtype !== 'Link') return;
@@ -177,11 +179,11 @@ function renderPage(num) {
         a.style.cursor = "pointer";
 
         if (ann.url) {
-          // ВЪНШНИ ЛИНКОВЕ
+          // ВЪНШНИ ЛИНКОВЕ (Към сайтове)
           a.href = ann.url;
-          a.target = "_blank"; // Гарантира нов раздел
+          a.target = "_blank"; 
         } else if (ann.dest) {
-          // ВЪТРЕШНИ ЛИНКОВЕ
+          // ВЪТРЕШНИ ЛИНКОВЕ (Към други слайдове)
           a.onclick = (e) => {
             e.preventDefault();
             if (typeof ann.dest === 'string') {
@@ -202,11 +204,12 @@ function renderPage(num) {
       });
     });
 
-    document.getElementById("pageInfo").textContent = `Page ${num} / ${pdfDoc.numPages}`;
+    document.getElementById("pageInfo").textContent = `Слайд ${num} / ${pdfDoc.numPages}`;
     pageNum = num;
   });
 }
 
+// Навигация
 function nextPage() {
   if (pageNum >= pdfDoc.numPages) return;
   renderPage(pageNum + 1);
@@ -225,6 +228,7 @@ function toggleFull() {
   }
 }
 
+// Преоразмеряване при промяна на прозореца
 window.addEventListener("resize", () => {
   if (pdfDoc) {
     renderPage(pageNum);
