@@ -91,55 +91,47 @@
   <canvas id="pdf-canvas"></canvas>
 </div>
 
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-
 <script>
-// Указваме къде се намира Worker скрипта
-pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-
-const url = "Portfolio-Savova-Diana-2026.pdf"; // Името трябва да съвпада точно!
+const url = "Portfolio-Savova-Diana-2026.pdf";
 
 let pdfDoc = null;
 let pageNum = 1;
 
 const canvas = document.getElementById("pdf-canvas");
 const ctx = canvas.getContext("2d");
-const pageInfo = document.getElementById("pageInfo");
-const errorMsg = document.getElementById("error-msg");
-const viewer = document.getElementById("viewer");
 
-// Зареждаме документа
-pdfjsLib.getDocument(url).promise.then(pdf => {
-  pdfDoc = pdf;
-  pageInfo.textContent = `1 / ${pdf.numPages}`;
-  renderPage(pageNum);
-}).catch(err => {
-  console.error("Грешка при зареждане на PDF:", err);
-  pageInfo.textContent = "Грешка";
-  errorMsg.style.display = "block";
+// 🔥 prevent PDF.js from resetting page on navigation
+const loadingTask = pdfjsLib.getDocument({
+  url: url,
+  disableAutoFetch: false
 });
 
-// Функцията, която рисува страницата и изчислява точния мащаб
+loadingTask.promise.then(pdf => {
+  pdfDoc = pdf;
+  renderPage(pageNum);
+});
+
+// 📏 auto-fit scale (IMPORTANT FIX)
+function getScale(page) {
+  const viewport = page.getViewport({ scale: 1 });
+
+  const maxWidth = window.innerWidth;
+  const maxHeight = window.innerHeight - 60; // controls bar
+
+  return Math.min(
+    maxWidth / viewport.width,
+    maxHeight / viewport.height
+  );
+}
+
 function renderPage(num) {
   pdfDoc.getPage(num).then(page => {
-    
-    // Взимаме оригиналните размери на PDF страницата
-    const unscaledViewport = page.getViewport({ scale: 1.0 });
 
-    // Взимаме размерите на празното място на екрана, където ще стои PDF-а
-    const containerWidth = viewer.clientWidth - 20; 
-    const containerHeight = viewer.clientHeight - 20;
+    const scale = getScale(page);
+    const viewport = page.getViewport({ scale });
 
-    // Изчисляваме мащаба така, че страницата да се побере изцяло без скролиране
-    const scaleX = containerWidth / unscaledViewport.width;
-    const scaleY = containerHeight / unscaledViewport.height;
-    const fitScale = Math.min(scaleX, scaleY); // Взимаме по-малкия мащаб
-
-    // Прилагаме новия изчислен мащаб
-    const viewport = page.getViewport({ scale: fitScale });
-
-    canvas.height = viewport.height;
     canvas.width = viewport.width;
+    canvas.height = viewport.height;
 
     const renderContext = {
       canvasContext: ctx,
@@ -147,37 +139,34 @@ function renderPage(num) {
     };
 
     page.render(renderContext);
-    pageInfo.textContent = `${num} / ${pdfDoc.numPages}`;
+
+    document.getElementById("pageInfo").textContent =
+      `Page ${num} / ${pdfDoc.numPages}`;
+
+    pageNum = num;
   });
 }
 
-// Навигация
 function nextPage() {
-  if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
-  pageNum++;
-  renderPage(pageNum);
+  if (pageNum >= pdfDoc.numPages) return;
+  renderPage(pageNum + 1);
 }
 
 function prevPage() {
-  if (!pdfDoc || pageNum <= 1) return;
-  pageNum--;
+  if (pageNum <= 1) return;
+  renderPage(pageNum - 1);
+}
+
+// 🔥 FIX 2: external links open in NEW TAB
+pdfjsLib.getDocument({
+  url: url,
+  externalLinkTarget: pdfjsLib.LinkTarget.BLANK,
+  ignoreDestinationZoom: true
+});
+
+// 🔥 keep page on resize (no reset)
+window.addEventListener("resize", () => {
   renderPage(pageNum);
-}
-
-// Режим на цял екран
-function toggleFull() {
-  if (!document.fullscreenElement) {
-    document.documentElement.requestFullscreen();
-  } else {
-    document.exitFullscreen();
-  }
-}
-
-// Ако потребителят промени размера на прозореца, преоразмеряваме страницата автоматично
-window.addEventListener('resize', () => {
-  if (pdfDoc) {
-    renderPage(pageNum);
-  }
 });
 </script>
 
