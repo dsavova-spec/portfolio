@@ -24,6 +24,7 @@
       gap: 10px;
       align-items: center;
       color: white;
+      z-index: 20;
     }
 
     button {
@@ -84,20 +85,13 @@ let pageNum = 1;
 const canvas = document.getElementById("pdf-canvas");
 const ctx = canvas.getContext("2d");
 
-// 🔥 IMPORTANT: full link + navigation support
-const loadingTask = pdfjsLib.getDocument({
-  url: url,
-  externalLinkTarget: pdfjsLib.LinkTarget.BLANK
-});
-
-loadingTask.promise.then(pdf => {
+// 🔥 FIXED: stable loader (this is the correct one)
+pdfjsLib.getDocument(url).promise.then(pdf => {
   pdfDoc = pdf;
   renderPage(pageNum);
 });
 
-// 🔥 CRITICAL FIX: LinkService (handles internal links)
-const linkService = new pdfjsLib.PDFLinkService();
-
+// 📏 auto-fit to screen
 function getScale(page) {
   const viewport = page.getViewport({ scale: 1 });
 
@@ -126,14 +120,6 @@ function renderPage(num) {
 
     page.render(renderContext);
 
-    // 🔥 THIS enables internal navigation
-    linkService.setDocument(pdfDoc);
-    linkService.setViewer({
-      scrollPageIntoView: ({ pageNumber }) => {
-        renderPage(pageNumber);
-      }
-    });
-
     document.getElementById("pageInfo").textContent =
       `Page ${num} / ${pdfDoc.numPages}`;
 
@@ -159,6 +145,7 @@ function toggleFull() {
   }
 }
 
+// 🔥 resize fix
 window.addEventListener("resize", () => {
   renderPage(pageNum);
 });
