@@ -42,30 +42,37 @@
 
     #viewer {
       flex: 1;
-      position: relative;
       display: flex;
       justify-content: center;
       align-items: center;
       background: #222;
-      overflow: auto;
+      overflow: hidden;
+    }
+
+    /* 🔥 Нов контейнер, който ще държи заедно платното и линковете */
+    #page-container {
+      position: relative;
     }
 
     canvas {
       display: block;
+      box-shadow: 0 0 15px rgba(0,0,0,0.5); /* Добавена сянка за стил */
     }
 
-    /* 🔥 link layer (for clickable PDF links) */
+    /* Слой за линковете - вече покрива точно платното, а не целия екран */
     #link-layer {
       position: absolute;
       top: 0;
       left: 0;
-      right: 0;
-      bottom: 0;
+      width: 100%;
+      height: 100%;
       z-index: 10;
     }
 
     #pageInfo {
       margin: 0 10px;
+      min-width: 80px;
+      text-align: center;
     }
   </style>
 </head>
@@ -74,20 +81,24 @@
 
 <div id="controls">
   <button onclick="prevPage()">⬅ Назад</button>
-  <span id="pageInfo">Loading...</span>
+  <span id="pageInfo">Зареждане...</span>
   <button onclick="nextPage()">Напред ➡</button>
-  <button onclick="toggleFull()">Fullscreen</button>
+  <button onclick="toggleFull()">На цял екран</button>
 </div>
 
 <div id="viewer">
-  <canvas id="pdf-canvas"></canvas>
-  <div id="link-layer"></div>
+  <div id="page-container">
+    <canvas id="pdf-canvas"></canvas>
+    <div id="link-layer"></div>
+  </div>
 </div>
 
-<!-- PDF.js -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
 <script>
+// 1. ЗАДЪЛЖИТЕЛНО: Указваме къде се намира Worker скрипта!
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
 const url = "Portfolio-Savova-Diana-2026.pdf";
 
 let pdfDoc = null;
@@ -96,25 +107,31 @@ let pageNum = 1;
 const canvas = document.getElementById("pdf-canvas");
 const ctx = canvas.getContext("2d");
 const linkLayer = document.getElementById("link-layer");
+const pageContainer = document.getElementById("page-container");
+const pageInfo = document.getElementById("pageInfo");
 
-// 🔥 load PDF with proper link handling
+// Зареждаме PDF файла с обработка на грешки
 const loadingTask = pdfjsLib.getDocument({
   url: url,
-  externalLinkTarget: pdfjsLib.LinkTarget.BLANK,
+  // Използваме числото 2 (което в PDF.js се равнява на BLANK), за да отваря в нов таб
+  externalLinkTarget: 2, 
   ignoreDestinationZoom: true
 });
 
 loadingTask.promise.then(pdf => {
   pdfDoc = pdf;
   renderPage(pageNum);
+}).catch(err => {
+  console.error("Грешка при зареждане:", err);
+  pageInfo.textContent = "Грешка!";
 });
 
-// 📏 auto-fit scale
+// Автоматичен мащаб
 function getScale(page) {
   const viewport = page.getViewport({ scale: 1 });
-
   const maxWidth = window.innerWidth;
-  const maxHeight = window.innerHeight - 60;
+  // Вадим 60px заради менюто горе + малко отстояние
+  const maxHeight = window.innerHeight - 80; 
 
   return Math.min(
     maxWidth / viewport.width,
@@ -130,6 +147,10 @@ function renderPage(num) {
 
     canvas.width = viewport.width;
     canvas.height = viewport.height;
+    
+    // Задаваме същите размери на контейнера, за да може линковете да са точни
+    pageContainer.style.width = viewport.width + "px";
+    pageContainer.style.height = viewport.height + "px";
 
     const renderContext = {
       canvasContext: ctx,
@@ -138,18 +159,17 @@ function renderPage(num) {
 
     page.render(renderContext);
 
-    // 🔥 clear old links
+    // Изчистваме старите линкове
     linkLayer.innerHTML = "";
 
-    // 🔥 build clickable annotation layer
+    // Изграждаме невидимите линкове от PDF-а
     page.getAnnotations().then(annotations => {
-
       annotations.forEach(ann => {
         if (!ann.url) return;
 
         const a = document.createElement("a");
         a.href = ann.url;
-        a.target = "_blank";
+        a.target = "_blank"; // Гарантира отваряне в нов раздел
 
         const rect = viewport.convertToViewportRectangle(ann.rect);
 
@@ -163,27 +183,28 @@ function renderPage(num) {
         a.style.top = y + "px";
         a.style.width = w + "px";
         a.style.height = h + "px";
-
         a.style.cursor = "pointer";
+        
+        // Съвет: Ако искаш да видиш дали линковете са на правилното място,
+        // махни наклонените черти на долния ред:
+        // a.style.backgroundColor = "rgba(255, 0, 0, 0.3)";
 
         linkLayer.appendChild(a);
       });
     });
 
-    document.getElementById("pageInfo").textContent =
-      `Page ${num} / ${pdfDoc.numPages}`;
-
+    pageInfo.textContent = `Слайд ${num} / ${pdfDoc.numPages}`;
     pageNum = num;
   });
 }
 
 function nextPage() {
-  if (pageNum >= pdfDoc.numPages) return;
+  if (!pdfDoc || pageNum >= pdfDoc.numPages) return;
   renderPage(pageNum + 1);
 }
 
 function prevPage() {
-  if (pageNum <= 1) return;
+  if (!pdfDoc || pageNum <= 1) return;
   renderPage(pageNum - 1);
 }
 
@@ -195,8 +216,11 @@ function toggleFull() {
   }
 }
 
+// Преоразмеряване при завъртане или промяна на прозореца
 window.addEventListener("resize", () => {
-  renderPage(pageNum);
+  if(pdfDoc) {
+    renderPage(pageNum);
+  }
 });
 </script>
 
