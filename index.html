@@ -6,26 +6,29 @@
   <title>Portfolio Viewer</title>
 
   <style>
+    /* Премахваме всякакви отстояния и забраняваме скрола на самия сайт */
     html, body {
       margin: 0;
-      height: 100%;
+      padding: 0;
+      height: 100vh;
+      width: 100vw;
       overflow: hidden;
-      background: #111;
+      background: #222; /* Тъмен фон около PDF-а */
     }
 
+    /* Разпъваме рамката на 100% от екрана */
     iframe {
       width: 100%;
       height: 100%;
       border: none;
+      display: block;
     }
   </style>
 </head>
 
 <body>
 
-<iframe
-  src="https://mozilla.github.io/pdf.js/web/viewer.html?file=Portfolio-Savova-Diana-2026.pdf"
-></iframe>
+  <iframe src="Portfolio-Savova-Diana-2026.pdf#toolbar=0&navpanes=0&view=Fit"></iframe>
 
 </body>
 </html>
